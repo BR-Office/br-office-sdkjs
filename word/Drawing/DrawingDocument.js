@@ -6509,6 +6509,33 @@ function CDrawingDocument()
 	};
 
 	// при загрузке документа - нужно понять какие шрифты используются
+	// Extends logicDocument.Fonts with the fonts of the given changed objects. Returns false if the full walk is needed.
+	this.CheckFontNeedsIncremental = function(aClasses)
+	{
+		var oLogicDocument = this.m_oWordControl.m_oLogicDocument;
+		if (!oLogicDocument || !oLogicDocument.Fonts || !oLogicDocument.Fonts.length || !oLogicDocument.GetFontNamesFromClasses)
+			return false;
+
+		var map_keys = oLogicDocument.GetFontNamesFromClasses(aClasses);
+		if (!map_keys)
+			return false;
+
+		var dstfonts = oLogicDocument.Fonts.slice();
+		var map_old  = {};
+		for (var nIndex = 0; nIndex < dstfonts.length; ++nIndex)
+			map_old[dstfonts[nIndex].name] = true;
+
+		for (var i in map_keys)
+		{
+			if (!map_old[i])
+				dstfonts[dstfonts.length] = new AscFonts.CFont(i);
+		}
+
+		AscFonts.FontPickerByCharacter.extendFonts(dstfonts);
+		oLogicDocument.Fonts = dstfonts;
+		return true;
+	};
+
 	this.CheckFontNeeds = function()
 	{
 		var map_keys;
