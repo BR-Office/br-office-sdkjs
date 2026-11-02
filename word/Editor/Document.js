@@ -12082,6 +12082,26 @@ CDocument.prototype.Document_Get_AllFontNames = function()
 	AscFormat.checkThemeFonts(AllFonts, this.theme.themeElements.fontScheme);
 	return AllFonts;
 };
+/**
+ * Font names used by the given changed objects (plus theme fonts), or null if one of them is not a known
+ * text container (styles, numbering, sections, theme, drawings...): the caller then does the full walk.
+ */
+CDocument.prototype.GetFontNamesFromClasses = function(aClasses)
+{
+	var AllFonts = {};
+	for (var nIndex = 0, nCount = aClasses.length; nIndex < nCount; ++nIndex)
+	{
+		var oClass = aClasses[nIndex];
+		if (oClass instanceof AscCommonWord.CDocumentContentElementBase && oClass.GetAllFontNames)
+			oClass.GetAllFontNames(AllFonts);
+		else if (oClass instanceof AscWord.CRun)
+			oClass.Get_AllFontNames(AllFonts);
+		else
+			return null;
+	}
+	AscFormat.checkThemeFonts(AllFonts, this.theme.themeElements.fontScheme);
+	return AllFonts;
+};
 CDocument.prototype.Document_UpdateInterfaceState = function(bSaveCurRevisionChange)
 {
 	this.UpdateInterface(bSaveCurRevisionChange);
