@@ -47,34 +47,63 @@
 	 */
 	function StyleCache()
 	{
-		this.data = {};
+		this.data = new Map();
+		// Key of every cached object, so remove() (called with the cached object itself) does not serialize again
+		this.keys = new WeakMap();
 	}
 	StyleCache.prototype.add = function(data)
 	{
-		let key = this.getKey(data);
-		if (this.data[key])
-			++this.data[key].ref;
+		let key   = this.getKey(data);
+		let entry = this.data.get(key);
+		if (entry)
+		{
+			++entry.ref;
+		}
 		else
-			this.data[key] = new CacheEntry(data);
+		{
+			entry = new CacheEntry(data);
+			this.data.set(key, entry);
+			this.keys.set(data, key);
+		}
 		
-		return this.data[key].data;
+		return entry.data;
 	};
 	StyleCache.prototype.remove = function(data)
 	{
-		let key = this.getKey(data);
-		if (!this.data[key])
+		let key = this.keys.get(data);
+		if (undefined === key)
+			key = this.getKey(data);
+		
+		let entry = this.data.get(key);
+		if (!entry)
 			return;
 		
-		--this.data[key].ref;
-		if (!this.data[key].ref)
-			delete this.data[key];
+		--entry.ref;
+		if (!entry.ref)
+		{
+			this.data.delete(key);
+			this.keys.delete(entry.data);
+		}
 	};
 	StyleCache.prototype.getKey = function(data)
 	{
 		memory.Seek(0);
 		data.WriteToBinary(memory);
-		return memory.sha256();
+		// Exact key: the serialized bytes themselves, as a string. Cheaper than sha256 + hex on every
+		// CTextPr compile (shape text on pptx open) and it cannot collide.
+		return bytesToKey(memory.data, memory.pos);
 	};
+	function bytesToKey(bytes, len)
+	{
+		const CHUNK = 8192;
+		if (len <= CHUNK)
+			return String.fromCharCode.apply(null, bytes.subarray(0, len));
+		
+		let key = "";
+		for (let pos = 0; pos < len; pos += CHUNK)
+			key += String.fromCharCode.apply(null, bytes.subarray(pos, Math.min(pos + CHUNK, len)));
+		return key;
+	}
 	
 	//--------------------------------------------------------export----------------------------------------------------
 	AscWord.g_textPrCache = new StyleCache();
