@@ -288,7 +288,9 @@
         HB_DIRECTION_BTT        : 7
     };
 
-    AscFonts.hb_get_script_horizontal_direction = function(script)
+    /* Reference definition (HarfBuzz hb_script_get_horizontal_direction). Not called per character:
+       it only fills the lookup table below once, so the table equals the switch for every HB_SCRIPT value. */
+    function hb_get_script_horizontal_direction_switch(script)
     {
         let BASE = AscFonts.HB_SCRIPT;
         /* https://docs.google.com/spreadsheets/d/1Y90M0Ie3MUJ6UVCRDOypOtijlMDLNNyyLk36T6iMu0o */
@@ -372,7 +374,33 @@
         }
 
         return AscFonts.HB_DIRECTION.HB_DIRECTION_LTR;
+    }
+
+    /* Precomputed script -> direction table, only non-LTR scripts are stored (LTR is the default of the switch,
+       including for values that are not HB_SCRIPT members). Replaces a ~45-case switch evaluated per character. */
+    const hb_script_direction_table = new Map();
+    for (let name in AscFonts.HB_SCRIPT)
+    {
+        let script = AscFonts.HB_SCRIPT[name];
+        let dir = hb_get_script_horizontal_direction_switch(script);
+        if (dir !== AscFonts.HB_DIRECTION.HB_DIRECTION_LTR)
+            hb_script_direction_table.set(script, dir);
+    }
+    const HB_DIRECTION_LTR_VALUE = AscFonts.HB_DIRECTION.HB_DIRECTION_LTR;
+
+    const HB_SCRIPT_LATIN_VALUE  = AscFonts.HB_SCRIPT.HB_SCRIPT_LATIN;
+    const HB_SCRIPT_COMMON_VALUE = AscFonts.HB_SCRIPT.HB_SCRIPT_COMMON;
+
+    AscFonts.hb_get_script_horizontal_direction = function(script)
+    {
+        // Fast path for the overwhelmingly common scripts (both LTR, as in the switch)
+        if (script === HB_SCRIPT_LATIN_VALUE || script === HB_SCRIPT_COMMON_VALUE)
+            return HB_DIRECTION_LTR_VALUE;
+
+        let dir = hb_script_direction_table.get(script);
+        return undefined === dir ? HB_DIRECTION_LTR_VALUE : dir;
     };
+    AscFonts.hb_get_script_horizontal_direction_switch = hb_get_script_horizontal_direction_switch;
 
 	const BASE = AscFonts.HB_SCRIPT;
 
