@@ -142,7 +142,10 @@ $(function() {
 				mem.context.clearCurrentPartDataMaps();
 				let pkg = new AscCommon.openXml.OpenXmlPackage(new AscCommon.ZLib(), mem);
 				pkg.getXmlBytes(this, new AscFormat.CChartSpace(api), mem);
-			}, "CChartSpace.toXml is the throwing generic stub");
+			}, function (err) {
+				// The generic stub writes a node with an undefined name; WriteXmlString then fails on it.
+				return err instanceof TypeError;
+			}, "serializing a CChartSpace via OpenXmlPackage.getXmlBytes throws a TypeError (generic toXml stub, no chartEx serializer)");
 		});
 
 		let ignoreQuotes = true;
@@ -200,8 +203,9 @@ $(function() {
 			let componentClass = AscFormat[componentClassName];
 			if (componentClass) {
 				let componentObject = new componentClass(api);
-				// CChartSpace only has the generic CBaseNoIdObject fromXml/toXml stubs (toXml throws in
-				// CMemory.WriteXmlString): the chartEx XML serializer is not in this codebase (PKT-0090).
+				// CChartSpace only has the generic CBaseNoIdObject fromXml/toXml stubs; serializing it via
+				// OpenXmlPackage.getXmlBytes throws in CMemory.WriteXmlString (a bare toXml does not throw).
+				// The chartEx XML serializer is not in this codebase (PKT-0090).
 				QUnit.test.skip(testName + " (skipped: no chartEx XML serializer in this codebase)", function (assert) {
 					testFileSerializeUseStringsCompare(assert, componentObject, fileContent, ignoreQuotes, doRemoveLineBreaks);
 				});
