@@ -10,26 +10,17 @@
 		<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/qunit/2.16.0/qunit.min.js"></script>
 		<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/xregexp/3.2.0/xregexp-all.min.js"></script>
 
-		<script type="text/javascript" src="../../../develop/sdkjs/cell/scripts.js"></script>
 		<script type="text/javascript">
-			window["WebAssembly"] = undefined
-			window.sdk_scripts.forEach(function(item){
-				document.write('<script type="text/javascript" src="' + item + '"><\/script>');
-			});
-    	</script>
+			// No common/AllFonts.js here: asc_docs_api needs this global to construct (PKT-0090).
+			var g_fonts_selection_bin = "";
+			window["WebAssembly"] = undefined;
+		</script>
 		<script type="text/javascript" src="../../../develop/sdkjs/slide/scripts.js"></script>
 		<script type="text/javascript">
 			window.sdk_scripts.forEach(function(item){
 				document.write('<script type="text/javascript" src="' + item + '"><\/script>');
 			});
     	</script>
-		<script type="text/javascript" src="../../../develop/sdkjs/word/scripts.js"></script>
-		<script type="text/javascript">
-			window.sdk_scripts.forEach(function(item){
-				document.write('<script type="text/javascript" src="' + item + '"><\/script>');
-			});
-    	</script>
-
 		<script type="text/javascript" src="chartEx-serialize-files.js"></script>
 		<script type="text/javascript" src="chartEx-serialize-files-many.js"></script>
 		<script type="text/javascript" src="chartEx-serialize.js"></script>
