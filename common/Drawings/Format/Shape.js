@@ -2870,7 +2870,8 @@
 
 
 		// PKT-0085: cache of compiled text styles for placeholders, valid only right after open
-		// (History has no points). The first history point clears and disables it.
+		// (History has no points, single user, no remote changes). The first history point, co-editing
+		// or a remote change clears and disables it.
 		var g_oTextStylesCache = {map: {}, size: 0, disabled: false};
 		var TEXT_STYLES_CACHE_MAX = 5000;
 		function getObjId(o) {
@@ -2885,7 +2886,14 @@
 				return null;
 			}
 			var oHistory = AscCommon.History;
-			if (!oHistory || oHistory.Index !== -1 || (oHistory.Points && oHistory.Points.length > 0)) {
+			// Co-editing: remote changes are applied without local history points and the key holds
+			// only Ids, so the cache is switched off for good as soon as co-editing is active or a
+			// remote change has arrived.
+			var oCoEdit = AscCommon.CollaborativeEditing;
+			var bCoEdit = !oCoEdit || (oCoEdit.Is_SingleUser && !oCoEdit.Is_SingleUser())
+				|| (oCoEdit.m_aChanges && oCoEdit.m_aChanges.length > 0)
+				|| (oApi.isCoAuthoringEnable === true && oApi.CoAuthoringApi && oApi.CoAuthoringApi.get_onlineWork && oApi.CoAuthoringApi.get_onlineWork() && oCoEdit.m_nUseType !== 1);
+			if (bCoEdit || !oHistory || oHistory.Index !== -1 || (oHistory.Points && oHistory.Points.length > 0)) {
 				g_oTextStylesCache.map = {};
 				g_oTextStylesCache.size = 0;
 				g_oTextStylesCache.disabled = true;
