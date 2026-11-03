@@ -83,6 +83,10 @@ CWordCollaborativeEditing.prototype.private_CollectFontCheckClasses = function()
 	for (var nIndex = nStart; nIndex <= nEnd; ++nIndex)
 	{
 		var oChange = aChanges[nIndex];
+		// Per-point description record (CTableId): carries no fonts, must not force the full walk
+		if (oChange && AscDFH.historyitem_TableId_Description === oChange.Type)
+			continue;
+
 		var oClass  = oChange && oChange.GetClass ? oChange.GetClass() : (oChange ? oChange.Class : null);
 		if (!oClass)
 		{
