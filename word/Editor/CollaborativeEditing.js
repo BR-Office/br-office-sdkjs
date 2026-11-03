@@ -84,6 +84,14 @@ CWordCollaborativeEditing.prototype.private_CollectFontCheckClasses = function()
 	{
 		var oChange = aChanges[nIndex];
 		var oClass  = oChange && oChange.GetClass ? oChange.GetClass() : (oChange ? oChange.Class : null);
+		if (oChange && oChange.Type === AscDFH.historyitem_TableId_Add)
+		{
+			// Registration of a new object (Class is g_oTableId): look at the registered object instead.
+			// If it cannot be resolved, push null below (full walk).
+			oClass = oChange.NewClass
+				|| (oChange.Id && AscCommon.g_oTableId ? AscCommon.g_oTableId.Get_ById(oChange.Id) : null)
+				|| null;
+		}
 		if (!oClass)
 		{
 			// Unknown object: force the full walk
