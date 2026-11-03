@@ -133,6 +133,16 @@ $(function() {
 			assert.ok(api, "asc_docs_api constructed");
 			assert.ok(AscFormat.CChartSpace, "AscFormat.CChartSpace defined");
 			assert.ok(Asc.document1Base64, "sample file loaded");
+			// Pins the PKT-0090 surprise: CChartSpace only has the generic CBaseNoIdObject
+			// toXml stub; serializing it through OpenXmlPackage.getXmlBytes throws. If this starts passing,
+			// a real serializer exists and "Compare 1xml" can be un-skipped.
+			assert.throws(function () {
+				let mem = new AscCommon.CMemory();
+				mem.context = new AscCommon.XmlWriterContext();
+				mem.context.clearCurrentPartDataMaps();
+				let pkg = new AscCommon.openXml.OpenXmlPackage(new AscCommon.ZLib(), mem);
+				pkg.getXmlBytes(this, new AscFormat.CChartSpace(api), mem);
+			}, "CChartSpace.toXml is the throwing generic stub");
 		});
 
 		let ignoreQuotes = true;
