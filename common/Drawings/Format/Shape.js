@@ -2869,7 +2869,87 @@
 		};
 
 
+		// PKT-0085: cache of compiled text styles for placeholders, valid only right after open
+		// (History has no points). The first history point clears and disables it.
+		var g_oTextStylesCache = {map: {}, size: 0, disabled: false};
+		var TEXT_STYLES_CACHE_MAX = 5000;
+		function getObjId(o) {
+			return (o && o.Get_Id) ? o.Get_Id() : "-";
+		}
+		CShape.prototype.getTextStylesCacheKey = function (level) {
+			if (g_oTextStylesCache.disabled) {
+				return null;
+			}
+			var oApi = Asc.editor || window.editor;
+			if (!oApi || oApi.editorId !== AscCommon.c_oEditorId.Presentation || (oApi.isPdfEditor && oApi.isPdfEditor())) {
+				return null;
+			}
+			var oHistory = AscCommon.History;
+			if (!oHistory || oHistory.Index !== -1 || (oHistory.Points && oHistory.Points.length > 0)) {
+				g_oTextStylesCache.map = {};
+				g_oTextStylesCache.size = 0;
+				g_oTextStylesCache.disabled = true;
+				return null;
+			}
+			if (!this.isPlaceholder() || (this instanceof AscFormat.CGraphicFrame) || this.isObjectInSmartArt()) {
+				return null;
+			}
+			if (this.txBody && this.txBody.lstStyle && this.txBody.lstStyle.levels && this.txBody.lstStyle.levels[level]) {
+				return null;
+			}
+			var compiled_style = this.getCompiledStyle && this.getCompiledStyle();
+			if (compiled_style && compiled_style.fontRef) {
+				return null;
+			}
+			var parents = this.getParentObjects();
+			var aKey = [level, getObjId(parents.presentation), getObjId(parents.master), getObjId(parents.theme), getObjId(parents.layout)];
+			aKey.push(this.getPlaceholderType(), this.getPlaceholderIndex ? this.getPlaceholderIndex() : "");
+			var hierarchy = this.getHierarchy(false);
+			for (var i = 0; i < hierarchy.length; ++i) {
+				aKey.push(getObjId(hierarchy[i]));
+			}
+			if (!this.bCheckAutoFitFlag) {
+				var oBodyPr = this.getBodyPr && this.getBodyPr();
+				aKey.push("b", oBodyPr ? oBodyPr.getLnSpcReduction() : "", oBodyPr ? oBodyPr.getFontScale() : "");
+			} else {
+				aKey.push("t", this.tmpLnSpcReduction, this.tmpFontScale);
+			}
+			return aKey.join("|");
+		};
+
 		CShape.prototype.recalculateTextStyles = function (level) {
+			var sKey = null;
+			try {
+				sKey = this.getTextStylesCacheKey(level);
+			} catch (e) {
+				sKey = null;
+			}
+			if (sKey !== null) {
+				var oCached = g_oTextStylesCache.map[sKey];
+				if (oCached) {
+					var parent_objects = this.getParentObjects();
+					this.compiledStyles[level] = {
+						styles: oCached.styles,
+						lastId: oCached.lastId,
+						shape: this,
+						slide: parent_objects.slide,
+						layout: parent_objects.layout,
+						master: parent_objects.master,
+						presentation: parent_objects.presentation,
+						notes: parent_objects.notes
+					};
+					return this.compiledStyles[level];
+				}
+			}
+			var oResult = this.computeTextStyles(level);
+			if (sKey !== null && oResult && g_oTextStylesCache.size < TEXT_STYLES_CACHE_MAX) {
+				g_oTextStylesCache.map[sKey] = {styles: oResult.styles, lastId: oResult.lastId};
+				g_oTextStylesCache.size++;
+			}
+			return oResult;
+		};
+
+		CShape.prototype.computeTextStyles = function (level) {
 			return AscFormat.ExecuteNoHistory(function () {
 				const logicDocument = this.getLogicDocument();
 				var parent_objects = this.getParentObjects();
