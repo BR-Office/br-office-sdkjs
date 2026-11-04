@@ -42,6 +42,11 @@
 	CSymbolRange.prototype["getEnd"] = function() { return this.End; };
 	CSymbolRange.prototype["getName"] = function() { return this.Name; };
 
+	function isPrivateUseCodePoint(code)
+	{
+		return (code >= 0xE000 && code <= 0xF8FF) || (code >= 0xF0000 && code <= 0xFFFFD) || (code >= 0x100000 && code <= 0x10FFFD);
+	}
+
 	function CFontByCharacter()
 	{
 		this.Ranges = [];
@@ -123,6 +128,12 @@
 				return "";
 
 			if (undefined === _char || 0 == _char)
+				return "";
+
+			// A private use code (the bullet of a Symbol or Wingdings list is U+F0B7) means something only in
+			// the font it was written for: no other font can stand in for it, so none is picked (and
+			// downloaded) for it. In a real document one such bullet fetched a 4 MB Korean font.
+			if (isPrivateUseCodePoint(_char))
 				return "";
 
 			if (this.LastRange)
