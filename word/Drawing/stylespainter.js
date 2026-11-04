@@ -75,11 +75,37 @@ CStylesPainter.prototype.CheckStylesNames = function(_api, ds)
 		}
 	}
 };
+// The style gallery thumbnails are drawn in time slices that share the main thread with the document's
+// background layout. Right after a document opens, that layout is what the user waits for, so the
+// gallery waits for it to finish (at most STYLES_WAIT_FOR_LAYOUT_MS), then draws. On a real 11-page
+// document the gallery took about 250 ms of the 2 s between the document arriving and its last page painted.
+var STYLES_WAIT_FOR_LAYOUT_MS = 3000;
 CStylesPainter.prototype.GenerateStyles = function(_api)
 {
+	if (this.deferTimer)
+	{
+		clearTimeout(this.deferTimer);
+		this.deferTimer = null;
+	}
+
+	var logicDocument = _api.WordControl ? _api.WordControl.m_oLogicDocument : null;
+	var isLayoutRunning = !!(logicDocument && logicDocument.FullRecalc && null != logicDocument.FullRecalc.Id);
+	if (isLayoutRunning)
+	{
+		if (!this.deferSince)
+			this.deferSince = performance.now();
+		if (performance.now() - this.deferSince < STYLES_WAIT_FOR_LAYOUT_MS)
+		{
+			var oThis = this;
+			this.deferTimer = setTimeout(function(){oThis.deferTimer = null; oThis.GenerateStyles(_api);}, 50);
+			return;
+		}
+	}
+	this.deferSince = null;
+
 	if (this.previewGenerator.IsInProgress())
 		this.previewGenerator.Stop();
-	
+
 	this.previewGenerator.Begin(_api);
 };
 CStylesPainter.prototype.OnEndGenerate = function(styles, _api)

@@ -38,25 +38,57 @@
 
     // Font style files fetched on demand by CFontInfo.LoadFont (a style the document did not use when
     // it opened). They are watched here rather than through the file's own callback, which the
-    // document loader may replace: when one arrives, the document is laid out again once, with the
-    // real file in place of the synthetic style it was measured with.
+    // document loader may replace. When one arrives, the document is laid out again once, with the real
+    // file in place of the synthetic style it was measured with, but only if the document's text uses
+    // that family and style: the style gallery, for one, draws "Heading" in bold with fonts the document
+    // never uses in bold, and relaying out the whole document for it cost 140 ms of every open.
     var lateFontStyles      = [];
     var lateFontStylesTimer = -1;
-    function loadLateFontStyle(font_loader, fontfile)
+    function loadLateFontStyle(font_loader, fontfile, fontInfo, style)
     {
         fontfile.LoadFontAsync(font_loader.fontFilesPath, null);
-        lateFontStyles.push(fontfile);
+        lateFontStyles.push({file : fontfile, info : fontInfo, style : style});
         if (-1 === lateFontStylesTimer)
             lateFontStylesTimer = setInterval(checkLateFontStyles, 100);
+    }
+    function styleMask(style)
+    {
+        switch (style)
+        {
+            case FontStyle.FontStyleBold:       return 0x04;
+            case FontStyle.FontStyleItalic:     return 0x02;
+            case FontStyle.FontStyleBoldItalic: return 0x08;
+            default:                            return 0x01;
+        }
+    }
+    // Whether the document's runs use one of these (font info, style) pairs. Without a way to tell
+    // (an editor without GetFontStyleMasks), assume they do.
+    function documentUsesLateStyles(drawingDocument, arrived)
+    {
+        if (!drawingDocument || !drawingDocument.GetFontStyleMasks || !AscFonts.g_fontApplication)
+            return true;
+        var masks = drawingDocument.GetFontStyleMasks();
+        if (!masks)
+            return true;
+        for (var name in masks)
+        {
+            var info = AscFonts.g_fontApplication.GetFontInfo(name);
+            for (var i = 0; i < arrived.length; i++)
+            {
+                if (info === arrived[i].info && 0 !== (masks[name] & styleMask(arrived[i].style)))
+                    return true;
+            }
+        }
+        return false;
     }
     function checkLateFontStyles()
     {
         var pending = [];
-        var arrived = false;
+        var arrived = [];
         for (var i = 0; i < lateFontStyles.length; i++)
         {
-            if (lateFontStyles[i].CheckLoaded())
-                arrived = true;
+            if (lateFontStyles[i].file.CheckLoaded())
+                arrived.push(lateFontStyles[i]);
             else
                 pending.push(lateFontStyles[i]);
         }
@@ -66,11 +98,13 @@
             clearInterval(lateFontStylesTimer);
             lateFontStylesTimer = -1;
         }
-        if (!arrived)
+        if (0 === arrived.length)
             return;
         var api = (window["Asc"] && window["Asc"]["editor"]) ? window["Asc"]["editor"] : window["editor"];
         var wordControl = api ? api.WordControl : null;
         var logicDocument = wordControl ? wordControl.m_oLogicDocument : null;
+        if (!documentUsesLateStyles(wordControl ? wordControl.m_oDrawingDocument : null, arrived))
+            return;
         if (logicDocument && logicDocument.RecalculateFromStart)
             logicDocument.RecalculateFromStart(true);
         else if (wordControl && wordControl.private_RefreshAll)
@@ -443,7 +477,7 @@
                 let fallback = this.GetLoadedFallback(font_loader, info.index);
                 if (fallback)
                 {
-                    loadLateFontStyle(font_loader, fontfile);
+                    loadLateFontStyle(font_loader, fontfile, this, style);
                     fontfile = font_loader.fontFiles[fallback.index];
                     info = {
                         index     : fallback.index,
