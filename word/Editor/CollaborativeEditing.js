@@ -62,6 +62,65 @@ CWordCollaborativeEditing.prototype.Clear = function()
 CWordCollaborativeEditing.prototype.Apply_OtherChanges = function()
 {
 	AscCommon.executeNoRevisions(AscCommon.CCollaborativeEditingBase.prototype.Apply_OtherChanges, this.GetLogicDocument(), this, arguments);
+	this.private_CollectFontCheckClasses();
+};
+/**
+ * Remember the objects touched by the changes just applied, so that pre_Save can collect font names from them only
+ * (instead of walking the whole document). m_aChanges holds binary data only: classes exist in CoHistory after apply.
+ */
+CWordCollaborativeEditing.prototype.private_CollectFontCheckClasses = function()
+{
+	var aChanges = this.CoHistory.GetAllChanges();
+	var nStart   = Math.max(0, this.m_nRecalcIndexStart);
+	var nEnd     = Math.min(aChanges.length - 1, this.m_nRecalcIndexEnd);
+
+	if (!this.m_aFontCheckClasses)
+	{
+		this.m_aFontCheckClasses = [];
+		this.m_oFontCheckIds     = {};
+	}
+
+	for (var nIndex = nStart; nIndex <= nEnd; ++nIndex)
+	{
+		var oChange = aChanges[nIndex];
+		// Per-point description record (CTableId): carries no fonts, must not force the full walk
+		if (oChange && AscDFH.historyitem_TableId_Description === oChange.Type)
+			continue;
+
+		var oClass  = oChange && oChange.GetClass ? oChange.GetClass() : (oChange ? oChange.Class : null);
+		if (oChange && oChange.Type === AscDFH.historyitem_TableId_Add)
+		{
+			// Registration of a new object (Class is g_oTableId): look at the registered object instead.
+			// If it cannot be resolved, push null below (full walk).
+			oClass = oChange.NewClass
+				|| (oChange.Id && AscCommon.g_oTableId ? AscCommon.g_oTableId.Get_ById(oChange.Id) : null)
+				|| null;
+		}
+		if (!oClass)
+		{
+			// Unknown object: force the full walk
+			this.m_aFontCheckClasses.push(null);
+			continue;
+		}
+
+		var sId = oClass.GetId ? oClass.GetId() : null;
+		if (sId && this.m_oFontCheckIds[sId])
+			continue;
+		if (sId)
+			this.m_oFontCheckIds[sId] = true;
+
+		this.m_aFontCheckClasses.push(oClass);
+	}
+};
+/**
+ * Returns (once) the classes touched by the remote changes applied since the last call, or null if there are none.
+ */
+CWordCollaborativeEditing.prototype.TakeFontCheckClasses = function()
+{
+	var aClasses = this.m_aFontCheckClasses;
+	this.m_aFontCheckClasses = null;
+	this.m_oFontCheckIds     = null;
+	return aClasses && aClasses.length ? aClasses : null;
 };
 CWordCollaborativeEditing.prototype.Send_Changes = function(IsUserSave, AdditionalInfo, IsUpdateInterface, isAfterAskSave)
 {
