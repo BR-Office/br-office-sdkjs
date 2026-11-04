@@ -8558,11 +8558,24 @@ background-repeat: no-repeat;\
 		this.FontLoader.LoadDocumentFonts2(_fonts);
 	};
 
+	// Styles of the editor's default fonts (Arial, Symbol, Wingdings, Courier New, Times New Roman)
+	// loaded with every document: the regular file only. Bold and italic files of these families are
+	// fetched on demand when a run asks for them (CFontInfo.LoadFont), so a cold open downloads less.
+	asc_docs_api.prototype.GetDefaultFontsStyles = function()
+	{
+		return 0x01;
+	};
 	asc_docs_api.prototype.pre_Save = function(_images)
 	{
 		this.isSaveFonts_Images = true;
 		this.saveImageMap       = _images;
-		this.WordControl.m_oDrawingDocument.CheckFontNeeds();
+
+		// Remote changes: collect font names only from the touched objects (the font set only grows, a superset is safe).
+		// Open, save and image paths have no pending classes and keep the full walk.
+		var oCoEditing = AscCommon.CollaborativeEditing;
+		var aClasses   = oCoEditing && oCoEditing.TakeFontCheckClasses ? oCoEditing.TakeFontCheckClasses() : null;
+		if (!aClasses || !this.isDocumentLoadComplete || !this.WordControl.m_oDrawingDocument.CheckFontNeedsIncremental(aClasses))
+			this.WordControl.m_oDrawingDocument.CheckFontNeeds();
 		this.FontLoader.LoadDocumentFonts2(this.WordControl.m_oLogicDocument.Fonts);
 	};
 

@@ -23,7 +23,6 @@
  *
  */
 
-const IS_APPROX_EQUALS = false;
 $(function () {
 function rgb(r, g, b, a) {
 	a = typeof a === 'number' ? a : 255;
@@ -31,14 +30,10 @@ function rgb(r, g, b, a) {
 }
 	const assertTest = (assert) => {
 		return (testObject) => {
-			if (IS_APPROX_EQUALS) {
-				assert.true(AscFormat.fApproxEqual(testObject.result.R, testObject.expected.R, 1.001), testObject.description + ": R");
-				assert.true(AscFormat.fApproxEqual(testObject.result.G, testObject.expected.G, 1.001), testObject.description + ": G");
-				assert.true(AscFormat.fApproxEqual(testObject.result.B, testObject.expected.B, 1.001), testObject.description + ": B");
-			} else {
-				assert.deepEqual(testObject.result, testObject.expected, testObject.description);
-			}
-
+			// Office applies mods in fixed point, the sdk in floats: allow +-1 on each 0-255 channel (R, G, B, A).
+			const r = testObject.result, e = testObject.expected;
+			const ok = ['R', 'G', 'B', 'A'].every(function (c) { return Math.abs(r[c] - e[c]) <= 1; });
+			assert.true(ok, testObject.description + ": got " + JSON.stringify(r) + ", expected " + JSON.stringify(e) + " (+-1)");
 		}
 	}
 function test(startColor, arrMods, expectedColor) {
