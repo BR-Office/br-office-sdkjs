@@ -142,11 +142,14 @@
             if (this.Api.IsNeedDefaultFonts())
             {
                 // теперь добавим шрифты, без которых редактор как без рук (спецсимволы + дефолтовые стили документа)
-                this.AddLoadFonts("Arial", 0x0F);
-                this.AddLoadFonts("Symbol", 0x0F);
-                this.AddLoadFonts("Wingdings", 0x0F);
-                this.AddLoadFonts("Courier New", 0x0F);
-                this.AddLoadFonts("Times New Roman", 0x0F);
+                // An editor may ask for fewer styles of these (the document editor: regular only, the
+                // others arrive on demand through CFontInfo.LoadFont); by default, every style.
+                let defaultStyles = this.Api.GetDefaultFontsStyles ? this.Api.GetDefaultFontsStyles() : 0x0F;
+                this.AddLoadFonts("Arial", defaultStyles);
+                this.AddLoadFonts("Symbol", defaultStyles);
+                this.AddLoadFonts("Wingdings", defaultStyles);
+                this.AddLoadFonts("Courier New", defaultStyles);
+                this.AddLoadFonts("Times New Roman", defaultStyles);
             }
 
             this.Api.asyncFontsDocumentStartLoaded();
@@ -169,8 +172,9 @@
             this.BlockOperationType = blockType;
 
             // сначала заполняем массив this.fonts_loading объекстами fontinfo
+            // A CFont may say which styles it needs (NeedStyles); without it, every style.
             for (var i in fonts)
-                this.AddLoadFonts(fonts[i].name, 0x0F);
+                this.AddLoadFonts(fonts[i].name, (undefined !== fonts[i].NeedStyles) ? fonts[i].NeedStyles : 0x0F);
 
             if (null == this.ThemeLoader)
                 this.Api.asyncFontsDocumentStartLoaded(this.BlockOperationType);

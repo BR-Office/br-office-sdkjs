@@ -8558,6 +8558,13 @@ background-repeat: no-repeat;\
 		this.FontLoader.LoadDocumentFonts2(_fonts);
 	};
 
+	// Styles of the editor's default fonts (Arial, Symbol, Wingdings, Courier New, Times New Roman)
+	// loaded with every document: the regular file only. Bold and italic files of these families are
+	// fetched on demand when a run asks for them (CFontInfo.LoadFont), so a cold open downloads less.
+	asc_docs_api.prototype.GetDefaultFontsStyles = function()
+	{
+		return 0x01;
+	};
 	asc_docs_api.prototype.pre_Save = function(_images)
 	{
 		this.isSaveFonts_Images = true;

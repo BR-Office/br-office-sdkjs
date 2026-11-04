@@ -36,6 +36,47 @@
 
     var isLoadFontsSync = (window["NATIVE_EDITOR_ENJINE"] === true);
 
+    // Font style files fetched on demand by CFontInfo.LoadFont (a style the document did not use when
+    // it opened). They are watched here rather than through the file's own callback, which the
+    // document loader may replace: when one arrives, the document is laid out again once, with the
+    // real file in place of the synthetic style it was measured with.
+    var lateFontStyles      = [];
+    var lateFontStylesTimer = -1;
+    function loadLateFontStyle(font_loader, fontfile)
+    {
+        fontfile.LoadFontAsync(font_loader.fontFilesPath, null);
+        lateFontStyles.push(fontfile);
+        if (-1 === lateFontStylesTimer)
+            lateFontStylesTimer = setInterval(checkLateFontStyles, 100);
+    }
+    function checkLateFontStyles()
+    {
+        var pending = [];
+        var arrived = false;
+        for (var i = 0; i < lateFontStyles.length; i++)
+        {
+            if (lateFontStyles[i].CheckLoaded())
+                arrived = true;
+            else
+                pending.push(lateFontStyles[i]);
+        }
+        lateFontStyles = pending;
+        if (0 === pending.length)
+        {
+            clearInterval(lateFontStylesTimer);
+            lateFontStylesTimer = -1;
+        }
+        if (!arrived)
+            return;
+        var api = (window["Asc"] && window["Asc"]["editor"]) ? window["Asc"]["editor"] : window["editor"];
+        var wordControl = api ? api.WordControl : null;
+        var logicDocument = wordControl ? wordControl.m_oLogicDocument : null;
+        if (logicDocument && logicDocument.RecalculateFromStart)
+            logicDocument.RecalculateFromStart(true);
+        else if (wordControl && wordControl.private_RefreshAll)
+            wordControl.private_RefreshAll();
+    }
+
     function CFontFileLoader(id)
     {
         this.LoadingCounter = 0;
@@ -366,6 +407,25 @@
                 fonts[this.indexBI].LoadFontAsync(basePath, null);
         },
 
+        // A loaded file of this family to stand in for `index` while its file is not loaded yet:
+        // regular first, then any loaded style. Returns null when nothing of the family is loaded.
+        GetLoadedFallback : function(font_loader, index)
+        {
+            let candidates = [
+                [this.indexR,  this.faceIndexR,  false, false],
+                [this.indexB,  this.faceIndexB,  true,  false],
+                [this.indexI,  this.faceIndexI,  false, true],
+                [this.indexBI, this.faceIndexBI, true,  true]
+            ];
+            for (let i = 0; i < candidates.length; i++)
+            {
+                let c = candidates[i];
+                if (-1 !== c[0] && c[0] !== index && 0 === font_loader.fontFiles[c[0]].Status)
+                    return { index : c[0], faceIndex : c[1], bold : c[2], italic : c[3] };
+            }
+            return null;
+        },
+
         LoadFont : function(font_loader, fontManager, fEmSize, style, dHorDpi, dVerDpi, transform, isNoSetupToManager)
         {
             let info = this.GetNeedInfo(style);
@@ -373,6 +433,26 @@
 
             if (window["NATIVE_EDITOR_ENJINE"] && fontfile.Status !== 0)
                 fontfile.LoadFontNative();
+
+            // Only the styles a document uses are downloaded when it opens (word CheckFontNeeds). A
+            // style asked for later, say bold switched on, has no file yet: fetch it now and, until it
+            // arrives, measure and draw with a loaded file of the family plus a synthetic style. The
+            // document is laid out again when the file is in.
+            if (-1 === fontfile.Status && !isLoadFontsSync)
+            {
+                let fallback = this.GetLoadedFallback(font_loader, info.index);
+                if (fallback)
+                {
+                    loadLateFontStyle(font_loader, fontfile);
+                    fontfile = font_loader.fontFiles[fallback.index];
+                    info = {
+                        index     : fallback.index,
+                        faceIndex : fallback.faceIndex,
+                        needB     : (0 !== (style & FontStyle.FontStyleBold)) && !fallback.bold,
+                        needI     : (0 !== (style & FontStyle.FontStyleItalic)) && !fallback.italic
+                    };
+                }
+            }
 
             var pFontFile = fontManager.LoadFont(fontfile, info.faceIndex, fEmSize,
                 (0 !== (style & FontStyle.FontStyleBold)) ? true : false,
