@@ -81,6 +81,20 @@
         }
         return false;
     }
+    // A loaded regular file to measure and draw with while a family that has nothing loaded is fetched:
+    // the editor's default font, else the first loaded file.
+    function getLoadedStandIn(font_loader)
+    {
+        var info = AscFonts.g_fontApplication ? AscFonts.g_fontApplication.GetFontInfo("Arial") : null;
+        if (info && -1 !== info.indexR && 0 === font_loader.fontFiles[info.indexR].Status)
+            return { index : info.indexR, faceIndex : info.faceIndexR, bold : false, italic : false };
+        for (var i = 0; i < font_loader.fontFiles.length; i++)
+        {
+            if (0 === font_loader.fontFiles[i].Status)
+                return { index : i, faceIndex : 0, bold : false, italic : false };
+        }
+        return null;
+    }
     function checkLateFontStyles()
     {
         var pending = [];
@@ -475,6 +489,10 @@
             if (-1 === fontfile.Status && !isLoadFontsSync)
             {
                 let fallback = this.GetLoadedFallback(font_loader, info.index);
+                // Nothing of the family is loaded (a font the document names but had no character for,
+                // now asked for by a typed or pasted character): stand in with the editor's default font.
+                if (!fallback)
+                    fallback = getLoadedStandIn(font_loader);
                 if (fallback)
                 {
                     loadLateFontStyle(font_loader, fontfile, this, style);

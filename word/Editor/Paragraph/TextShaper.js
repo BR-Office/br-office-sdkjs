@@ -404,6 +404,17 @@
 		
 		function getWidth(codePoint, flags)
 		{
+			// Only a font that declares an East Asian code page and has the probe character can give an
+			// East Asian en width: check the font itself first, so the measurer never reaches for a
+			// fallback font for the probe. Before, every Latin font measured U+AC00 through the fallback,
+			// which picked and downloaded a Korean font for documents without one Korean character.
+			let measurer = AscCommon.g_oTextMeasurer;
+			measurer.SetFontInternal(fontName, AscFonts.MEASURE_FONTSIZE, fontStyle);
+			let baseFont = measurer.m_oManager ? (measurer.m_oManager.m_oFont || measurer.m_oManager.m_pFont) : null;
+			let baseFace = baseFont && baseFont.m_pFaceInfo ? baseFont.m_pFaceInfo : null;
+			if (!baseFace || 0 === (baseFace.os2_ulCodePageRange1 & flags) || !baseFont.GetGIDByUnicode(codePoint))
+				return 0;
+
 			let grapheme = AscCommon.g_oTextMeasurer.GetGraphemeByUnicode(codePoint, fontName, fontStyle);
 			if (AscFonts.NO_GRAPHEME === grapheme)
 				return 0;

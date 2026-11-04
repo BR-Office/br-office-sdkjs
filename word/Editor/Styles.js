@@ -14352,18 +14352,30 @@ CTextPr.prototype.getFontCoef = function()
 {
 	return (AscCommon.vertalign_SubScript === this.VertAlign || AscCommon.vertalign_SubScript === this.VertAlign ? AscCommon.vaKSize : 1);
 };
-CTextPr.prototype.Document_Get_AllFontNames = function(AllFonts)
+/**
+ * @param AllFonts {Object} map of font names
+ * @param [fontSlots] {number} AscWord.fontslot_* mask of the slots the caller's text uses; when the names are
+ * collected to load fonts (AscCommon.g_fontNamesForLoad) and no mask is given, the East Asian and complex
+ * script fonts are left out: a document loads them only where a run has characters of those scripts
+ * (ParaRun.Get_AllFontNames), and a character that needs one later gets it on demand (CFontInfo.LoadFont).
+ * On a real document that named a Korean font in its styles without one Korean character, the two files of
+ * that font were 3.4 MB of the 5.5 MB downloaded to open it.
+ */
+CTextPr.prototype.Document_Get_AllFontNames = function(AllFonts, fontSlots)
 {
-	if (undefined != this.RFonts.Ascii)
+	if (undefined === fontSlots)
+		fontSlots = (true === AscCommon.g_fontNamesForLoad) ? (AscWord.fontslot_ASCII | AscWord.fontslot_HAnsi) : 0xFF;
+
+	if (undefined != this.RFonts.Ascii && (fontSlots & AscWord.fontslot_ASCII))
 		AllFonts[this.RFonts.Ascii.Name] = true;
 
-	if (undefined != this.RFonts.HAnsi)
+	if (undefined != this.RFonts.HAnsi && (fontSlots & AscWord.fontslot_HAnsi))
 		AllFonts[this.RFonts.HAnsi.Name] = true;
 
-	if (undefined != this.RFonts.EastAsia)
+	if (undefined != this.RFonts.EastAsia && (fontSlots & AscWord.fontslot_EastAsia))
 		AllFonts[this.RFonts.EastAsia.Name] = true;
 
-	if (undefined != this.RFonts.CS)
+	if (undefined != this.RFonts.CS && (fontSlots & AscWord.fontslot_CS))
 		AllFonts[this.RFonts.CS.Name] = true;
 };
 CTextPr.prototype.Document_CreateFontMap = function(FontMap, FontScheme)
