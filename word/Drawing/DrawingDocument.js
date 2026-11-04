@@ -6572,7 +6572,17 @@ function CDrawingDocument()
 		var map_styles = null;
 		if (this.m_oWordControl.m_oLogicDocument)
 		{
-			map_keys   = this.m_oWordControl.m_oLogicDocument.Document_Get_AllFontNames();
+			// The names are collected to load fonts: East Asian and complex script fonts only where the
+			// document has characters of those scripts (CTextPr.Document_Get_AllFontNames).
+			AscCommon.g_fontNamesForLoad = true;
+			try
+			{
+				map_keys = this.m_oWordControl.m_oLogicDocument.Document_Get_AllFontNames();
+			}
+			finally
+			{
+				AscCommon.g_fontNamesForLoad = false;
+			}
 			map_styles = this.GetFontStyleMasks();
 		}
 		else if (this.m_oDocumentRenderer)

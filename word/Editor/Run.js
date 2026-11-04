@@ -3124,9 +3124,26 @@ ParaRun.prototype.Create_FontMap = function(Map)
 
 ParaRun.prototype.Get_AllFontNames = function(AllFonts)
 {
-	this.Pr.Document_Get_AllFontNames(AllFonts);
-
 	var Count = this.Content.length;
+	if (true === AscCommon.g_fontNamesForLoad)
+	{
+		// Collected to load fonts: only the slots this run's characters use, from the compiled properties
+		// (a style may give the East Asian font). Non-text items say fontslot_Unknown and add nothing.
+		var oTextPr   = this.Get_CompiledPr(false);
+		var nSlots    = AscWord.fontslot_ASCII;
+		for (var nPos = 0; nPos < Count; ++nPos)
+		{
+			var nSlot = this.Content[nPos].GetFontSlot(oTextPr);
+			if (AscWord.fontslot_Unknown !== nSlot && AscWord.fontslot_None !== nSlot)
+				nSlots |= nSlot;
+		}
+		oTextPr.Document_Get_AllFontNames(AllFonts, nSlots);
+	}
+	else
+	{
+		this.Pr.Document_Get_AllFontNames(AllFonts);
+	}
+
 	for (var Index = 0; Index < Count; Index++)
 	{
 		var Item = this.Content[Index];
