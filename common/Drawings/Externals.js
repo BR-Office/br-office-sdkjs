@@ -121,8 +121,17 @@
             return;
         if (logicDocument && logicDocument.RecalculateFromStart)
             logicDocument.RecalculateFromStart(true);
+        else if (logicDocument && logicDocument.GetSlidesCount && logicDocument.Recalculate)
+        {
+            // a presentation: every slide again, as the editor does after a theme change
+            logicDocument.Recalculate({Drawings : {All : true, Map : {}}});
+            if (wordControl.m_oDrawingDocument && wordControl.m_oDrawingDocument.OnEndRecalculate)
+                wordControl.m_oDrawingDocument.OnEndRecalculate();
+        }
         else if (wordControl && wordControl.private_RefreshAll)
             wordControl.private_RefreshAll();
+        else if (api && api.wb && api.asc_Resize)
+            api.asc_Resize();   // a spreadsheet: lay the view out again with the arrived file
     }
 
     function CFontFileLoader(id)

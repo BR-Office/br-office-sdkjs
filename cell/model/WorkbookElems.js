@@ -5365,16 +5365,19 @@ function CCellStyles() {
 	// ToDo нужно все компоновать в общий список стилей (для того, чтобы не было проблем с добавлением стилей и отсутствия имени стиля)
 	this.AllStyles = {};
 }
-CCellStyles.prototype.generateFontMap = function (oFontMap) {
-	this._generateFontMap(oFontMap, this.DefaultStyles);
-	this._generateFontMap(oFontMap, this.CustomStyles);
+// fAddFont, when given, receives each font object as well (the workbook records which style files it needs)
+CCellStyles.prototype.generateFontMap = function (oFontMap, fAddFont) {
+	this._generateFontMap(oFontMap, this.DefaultStyles, fAddFont);
+	this._generateFontMap(oFontMap, this.CustomStyles, fAddFont);
 };
-CCellStyles.prototype._generateFontMap = function (oFontMap, aStyles) {
+CCellStyles.prototype._generateFontMap = function (oFontMap, aStyles, fAddFont) {
 	var i, length, oStyle;
 	for (i = 0, length = aStyles.length; i < length; ++i) {
 		oStyle = aStyles[i];
-		if (null != oStyle.xfs && null != oStyle.xfs.font)
+		if (null != oStyle.xfs && null != oStyle.xfs.font) {
 			oFontMap[oStyle.xfs.font.getName()] = 1;
+			fAddFont && fAddFont(oStyle.xfs.font);
+		}
 	}
 };
 /**
@@ -13149,7 +13152,8 @@ function RangeDataManagerElem(bbox, data)
 	CSharedStrings.prototype.getCount = function() {
 		return this.all.length;
 	};
-	CSharedStrings.prototype.generateFontMap = function(oFontMap) {
+	// fAddFont, when given, receives each font object as well (the workbook records which style files it needs)
+	CSharedStrings.prototype.generateFontMap = function(oFontMap, fAddFont) {
 		var keys = Object.keys(this.multiTextMap);
 		for (var k = 0; k < keys.length; ++k) {
 			var mapElem = this.multiTextMap[keys[k]];
@@ -13159,6 +13163,7 @@ function RangeDataManagerElem(bbox, data)
 					var part = multiText[j];
 					if (part && part.format) {
 						oFontMap[part.format.getName()] = 1;
+						fAddFont && fAddFont(part.format);
 					}
 				}
 			}

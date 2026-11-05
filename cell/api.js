@@ -1795,6 +1795,12 @@ var editor;
     this.sync_StartAction(undefined === blockType ? c_oAscAsyncActionType.BlockInteraction : blockType, c_oAscAsyncAction.LoadDocumentFonts);
   };
 
+  // Styles of the editor's default fonts loaded with every workbook: the regular file only. Bold and italic
+  // files of these families are fetched on demand when a cell asks for them (CFontInfo.LoadFont).
+  spreadsheet_api.prototype.GetDefaultFontsStyles = function() {
+    return 0x01;
+  };
+
   spreadsheet_api.prototype.asyncFontsDocumentEndLoaded = function(blockType) {
     this.sync_EndAction(undefined === blockType ? c_oAscAsyncActionType.BlockInteraction : blockType, c_oAscAsyncAction.LoadDocumentFonts);
 
