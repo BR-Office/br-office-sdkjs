@@ -3137,15 +3137,70 @@ function CDrawingDocument()
 		}
 	};
 
+	// Which style files (regular, italic, bold, bold italic) the presentation's runs use of each font, from
+	// the font map the slides build for saving (Name, Style 0..3). Used to load only those at open; a style
+	// asked for later is fetched on demand by CFontInfo.LoadFont.
+	this.GetFontStyleMasks = function()
+	{
+		var oLogicDocument = this.m_oWordControl.m_oLogicDocument;
+		if (!oLogicDocument || !oLogicDocument.Document_CreateFontMap)
+			return null;
+
+		var map_styles = oLogicDocument.Document_CreateFontMap();
+		var masks      = {};
+		for (var key in map_styles)
+		{
+			var entry = map_styles[key];
+			if (!entry || !entry.Name)
+				continue;
+			var mask;
+			switch (entry.Style)
+			{
+				case 1:  mask = 0x04; break;  // bold
+				case 2:  mask = 0x02; break;  // italic
+				case 3:  mask = 0x08; break;  // bold italic
+				case 0:  mask = 0x01; break;  // regular
+				default: mask = 0x0F; break;  // unknown: every style
+			}
+			masks[entry.Name] = (masks[entry.Name] || 0) | mask;
+		}
+		return masks;
+	};
+
 	this.CheckFontNeeds = function()
 	{
-		var map_keys = this.m_oWordControl.m_oLogicDocument.Document_Get_AllFontNames();
+		var map_keys;
+		var map_styles = null;
+		// The names are collected to load fonts: the East Asian and complex script fonts of the theme are
+		// added only by runs that have characters of those scripts (CTextPr.Document_Get_AllFontNames),
+		// not by the theme itself. A deck whose theme names a Japanese font it never uses no longer
+		// downloads it (3.7 MB on the reference deck).
+		AscCommon.g_fontNamesForLoad = true;
+		try
+		{
+			map_keys = this.m_oWordControl.m_oLogicDocument.Document_Get_AllFontNames();
+		}
+		finally
+		{
+			AscCommon.g_fontNamesForLoad = false;
+		}
+		map_styles = this.GetFontStyleMasks();
+
+		// Only the style files the deck uses are downloaded at open (a family whose runs are all regular
+		// gets one file instead of four). A style asked for later is loaded on demand by CFontInfo.LoadFont,
+		// with a synthetic style until its file arrives, and the slides are laid out again then.
 		var dstfonts = [];
 		for (var i in map_keys)
 		{
-			dstfonts[dstfonts.length] = new AscFonts.CFont(i);
+			var mask = (map_styles && map_styles[i]) ? map_styles[i] : undefined;
+			dstfonts[dstfonts.length] = new AscFonts.CFont(i, "", 0, mask);
 		}
-        AscFonts.FontPickerByCharacter.extendFonts(dstfonts);
+		// Fonts the picker adds for characters the deck's fonts lack: the regular file is enough to draw
+		// them; another style, if a run asks for it, is fetched on demand.
+		var nDocumentFonts = dstfonts.length;
+		AscFonts.FontPickerByCharacter.extendFonts(dstfonts);
+		for (var nIndex = nDocumentFonts; nIndex < dstfonts.length; ++nIndex)
+			dstfonts[nIndex].NeedStyles = 0x01;
 		this.m_oWordControl.m_oLogicDocument.Fonts = dstfonts;
 		return;
 	};

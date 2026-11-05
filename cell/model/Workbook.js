@@ -4335,32 +4335,61 @@
 		}
 		return sNewName;
 	};
+	// Which style files (regular 1, italic 2, bold 4, bold italic 8) a cell font asks for.
+	function fontStyleMask(font) {
+		return font.getBold() ? (font.getItalic() ? 0x08 : 0x04) : (font.getItalic() ? 0x02 : 0x01);
+	}
 	Workbook.prototype._generateFontMap=function(){
 		var oFontMap = {
 			"Arial"		: 1
 		};
+		// Besides the names, which style files each family needs: exact where the font object says (cell
+		// styles, shared strings, named styles), unknown where only a name is available (theme, drawings).
+		// generateFontMap2 loads only those files at open instead of all four of every family.
+		var oMasks = {}, oUnknown = {};
+		var addExact = function (font) {
+			var name = font.getName();
+			oFontMap[name] = 1;
+			oMasks[name] = (oMasks[name] || 0) | fontStyleMask(font);
+		};
+		var addUnknown = function (oNames) {
+			for (var name in oNames) {
+				oFontMap[name] = 1;
+				oUnknown[name] = true;
+			}
+		};
 		var i;
 
-		oFontMap[g_oDefaultFormat.Font.getName()] = 1;
+		addExact(g_oDefaultFormat.Font);
 
 		//theme
-		if(null != this.theme)
-			AscFormat.checkThemeFonts(oFontMap, this.theme.themeElements.fontScheme);
+		if(null != this.theme) {
+			var oThemeFonts = {};
+			AscFormat.checkThemeFonts(oThemeFonts, this.theme.themeElements.fontScheme);
+			addUnknown(oThemeFonts);
+		}
 		//xfs
 		for (i = 1; i <= g_StyleCache.getXfCount(); ++i) {
 			var xf = g_StyleCache.getXf(i);
 			if (xf.font) {
-				oFontMap[xf.font.getName()] = 1;
+				addExact(xf.font);
 			}
 		}
 		//sharedStrings
-		this.sharedStrings.generateFontMap(oFontMap);
+		this.sharedStrings.generateFontMap(oFontMap, addExact);
 
+		var oDrawingFonts = {};
 		this.forEach(function (ws) {
-			ws.generateFontMap(oFontMap);
+			ws.generateFontMap(oDrawingFonts);
 		});
-		this.CellStyles.generateFontMap(oFontMap);
+		addUnknown(oDrawingFonts);
+		this.CellStyles.generateFontMap(oFontMap, addExact);
 
+		this._fontStyleMasks = {};
+		for (var name in oFontMap) {
+			if (!oUnknown[name] && oMasks[name])
+				this._fontStyleMasks[name] = oMasks[name];
+		}
 		return oFontMap;
 	};
 	Workbook.prototype.generateFontMap=function(){
@@ -4373,11 +4402,18 @@
 	};
 	Workbook.prototype.generateFontMap2=function(){
 		var oFontMap = this._generateFontMap();
+		var oMasks = this._fontStyleMasks || {};
 
+		// Only the style files the workbook uses are downloaded at open; a style asked for later (a theme or
+		// drawing font gets every style, so that is rare) is loaded on demand by CFontInfo.LoadFont.
 		var aRes = [];
 		for(var i in oFontMap)
-			aRes.push(new AscFonts.CFont(i));
+			aRes.push(new AscFonts.CFont(i, "", 0, oMasks[i]));
+		// Fonts the picker adds for characters the workbook's fonts lack: the regular file is enough.
+		var nWorkbookFonts = aRes.length;
 		AscFonts.FontPickerByCharacter.extendFonts(aRes);
+		for (var nIndex = nWorkbookFonts; nIndex < aRes.length; ++nIndex)
+			aRes[nIndex].NeedStyles = 0x01;
 		return aRes;
 	};
 	Workbook.prototype.getAllImageUrls = function(){
