@@ -73,17 +73,25 @@
         };
 
         // добавляем шрифт в список для загрузки
+        // A family asked for twice in one load (the document's Arial in bold, then the editor's default Arial in
+        // regular) needs the styles of both requests: the second one used to overwrite the first, and the bold
+        // file then arrived only after the open, through a late style and a second layout.
         this.AddLoadFonts = function(name, need_styles)
         {
             var fontinfo = g_fontApplication.GetFontInfo(name);
-            this.fonts_loading[this.fonts_loading.length] = fontinfo;
-            this.fonts_loading[this.fonts_loading.length - 1].NeedStyles = (need_styles === undefined) ? 0x0F : need_styles;
-			return fontinfo;
+            this.AddLoadFontsNotPick(fontinfo, need_styles);
+            return fontinfo;
         };
         this.AddLoadFontsNotPick = function(info, need_styles)
         {
+            var styles = (need_styles === undefined) ? 0x0F : need_styles;
+            if (-1 !== this.fonts_loading.indexOf(info))
+            {
+                info.NeedStyles |= styles;
+                return;
+            }
             this.fonts_loading[this.fonts_loading.length] = info;
-            this.fonts_loading[this.fonts_loading.length - 1].NeedStyles = (need_styles === undefined) ? 0x0F : need_styles;
+            info.NeedStyles = styles;
         };
 
         // проверить все fontinfo из fonts_loading на нужность загрузки, и вернуть есть ли хоть один заново запущенный
