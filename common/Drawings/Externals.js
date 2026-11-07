@@ -119,11 +119,37 @@
         var logicDocument = wordControl ? wordControl.m_oLogicDocument : null;
         if (!documentUsesLateStyles(wordControl ? wordControl.m_oDrawingDocument : null, arrived))
             return;
-        if (logicDocument && logicDocument.RecalculateFromStart)
+        relayoutAllText(api);
+    }
+    // Lays the whole document out again after font files changed under it: every paragraph is shaped again
+    // first, since the glyphs it holds were looked up in the file it was measured with (a stand-in for a style
+    // that had not arrived), and drawing them with the new file shows other letters.
+    function relayoutAllText(api)
+    {
+        var wordControl   = api ? api.WordControl : null;
+        var logicDocument = wordControl ? wordControl.m_oLogicDocument : null;
+        var reshape = function(paragraphs)
+        {
+            for (var i = 0; i < paragraphs.length; i++)
+            {
+                if (paragraphs[i] && paragraphs[i].RecalcInfo)
+                    paragraphs[i].RecalcInfo.NeedShapeText();
+            }
+        };
+        if (logicDocument && logicDocument.RecalculateFromStart && logicDocument.GetAllParagraphs)
+        {
+            reshape(logicDocument.GetAllParagraphs({All : true}));
             logicDocument.RecalculateFromStart(true);
+        }
         else if (logicDocument && logicDocument.GetSlidesCount && logicDocument.Recalculate)
         {
-            // a presentation: every slide again, as the editor does after a theme change
+            // a presentation: every slide (and its notes) again, as the editor does after a theme change
+            var slides = logicDocument.Slides || [];
+            for (var i = 0; i < slides.length; i++)
+            {
+                if (slides[i] && slides[i].handleAllContents)
+                    slides[i].handleAllContents(function(content) { reshape(content.GetAllParagraphs({All : true})); });
+            }
             logicDocument.Recalculate({Drawings : {All : true, Map : {}}});
             if (wordControl.m_oDrawingDocument && wordControl.m_oDrawingDocument.OnEndRecalculate)
                 wordControl.m_oDrawingDocument.OnEndRecalculate();
@@ -399,10 +425,12 @@
                 if ((this.NeedStyles & fontstyle_mask_bolditalic) !== 0)
                     needs[this.GetBaseStyle(FontStyle.FontStyleBoldItalic)] = true;
 
-                if (needs[0]) this.needR = true;
-                if (needs[1]) this.needI = true;
-                if (needs[2]) this.needB = true;
-                if (needs[3]) this.needBI = true;
+                // indexed by FontStyle (regular 0, bold 1, italic 2, bold italic 3): bold used to fetch the
+                // italic file and italic the bold one
+                if (needs[FontStyle.FontStyleRegular])    this.needR = true;
+                if (needs[FontStyle.FontStyleBold])       this.needB = true;
+                if (needs[FontStyle.FontStyleItalic])     this.needI = true;
+                if (needs[FontStyle.FontStyleBoldItalic]) this.needBI = true;
             }
 
             var fonts = global_loader.fontFiles;
